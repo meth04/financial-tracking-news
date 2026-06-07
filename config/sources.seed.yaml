@@ -1,0 +1,122 @@
+sources:
+  - key: fed_press_all
+    name: Federal Reserve - All Press Releases
+    type: rss
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, macro, rates, official]
+
+  - key: fed_press_monetary
+    name: Federal Reserve - Monetary Policy Press Releases
+    type: rss
+    url: https://www.federalreserve.gov/feeds/press_monetary.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, monetary_policy, rates, official]
+
+  - key: fed_speeches
+    name: Federal Reserve - Speeches
+    type: rss
+    url: https://www.federalreserve.gov/feeds/speeches.xml
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, speeches, macro, official]
+
+  - key: bea_news_releases
+    name: BEA - News Release Feed
+    type: rss
+    url: https://apps.bea.gov/rss/rss.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [bea, macro, gdp, pce, official]
+
+  - key: federal_register_financial
+    name: Federal Register - Financial Agencies
+    type: api
+    url: https://www.federalregister.gov/api/v1/documents.json
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 30
+    respect_robots: true
+    tags: [regulation, official]
+    config:
+      agencies:
+        - securities-and-exchange-commission
+        - commodity-futures-trading-commission
+        - federal-reserve-system
+        - treasury-department
+        - federal-deposit-insurance-corporation
+        - comptroller-of-the-currency
+        - consumer-financial-protection-bureau
+      conditions:
+        type:
+          - RULE
+          - PRORULE
+          - NOTICE
+
+  - key: treasury_press_releases
+    name: U.S. Treasury - Press Releases
+    type: html
+    url: https://home.treasury.gov/news/press-releases
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 15
+    respect_robots: true
+    tags: [treasury, sanctions, fiscal, official]
+
+  - key: sec_edgar_watchlist
+    name: SEC EDGAR - Watchlist Filings
+    type: api
+    url: https://data.sec.gov/submissions/
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [sec, filings, official]
+    config:
+      company_tickers_url: https://www.sec.gov/files/company_tickers.json
+      forms: [8-K, 10-Q, 10-K, 6-K, 20-F, S-1, S-3, 424B5]
+      tickers: [AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, BAC, WMT, XOM, CVX, UNH, BRK-B, AMD, INTC, NFLX, AVGO, COST]
+
+  - key: bls_latest_releases
+    name: BLS - Latest Economic Releases
+    type: html
+    url: https://www.bls.gov/bls/newsrels.htm
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 10
+    max_age_hours: 72
+    rate_limit_per_minute: 15
+    respect_robots: true
+    tags: [bls, labor_market, inflation, official]

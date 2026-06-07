@@ -1,0 +1,44 @@
+app:
+  name: financial-news-intelligence
+  env: development
+  port: 8080
+  public_url: http://localhost:8080
+
+freshness:
+  max_age_hours: 72
+  default_fresh_only: true
+
+crawler:
+  default_interval_minutes: 10
+  run_on_startup: true
+  max_parallel_sources: 4
+  http_timeout_seconds: 25
+  http_max_body_mb: 8
+  user_agent: "FinancialNewsIntel/0.1 contact:your-email@example.com"
+  respect_robots: true
+
+storage:
+  database_url_env: DATABASE_URL
+  raw_retention_days: 7
+  article_retention_days: 14
+  cluster_retention_days: 30
+
+llm:
+  base_url: http://localhost:8317/v1
+  api_key_env: LLM_API_KEY
+  model: gemini-3.1-flash-lite-preview
+  max_concurrency: 3
+  timeout_seconds: 90
+  max_attempts: 5
+  retry_backoff: ["1m", "5m", "15m", "1h"]
+
+api:
+  page_size_default: 50
+  page_size_max: 200
+  cors_allowed_origins:
+    - http://localhost:5173
+    - http://localhost:8080
+
+logging:
+  level: info
+  format: text

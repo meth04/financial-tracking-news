@@ -1,0 +1,130 @@
+openapi: 3.0.3
+info:
+  title: Financial News Intelligence API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/stats:
+    get:
+      summary: Dashboard stats
+      responses:
+        '200':
+          description: Stats
+  /api/articles:
+    get:
+      summary: List articles
+      parameters:
+        - in: query
+          name: q
+          schema: {type: string}
+        - in: query
+          name: source
+          schema: {type: string}
+        - in: query
+          name: ticker
+          schema: {type: string}
+        - in: query
+          name: event_type
+          schema: {type: string}
+        - in: query
+          name: impact
+          schema: {type: string, enum: [low, medium, high, critical]}
+        - in: query
+          name: sentiment
+          schema: {type: string, enum: [bullish, bearish, neutral, mixed]}
+        - in: query
+          name: fresh_only
+          schema: {type: boolean, default: true}
+        - in: query
+          name: page
+          schema: {type: integer, minimum: 1, default: 1}
+        - in: query
+          name: page_size
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200':
+          description: Article list
+  /api/articles/{id}:
+    get:
+      summary: Article detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Article detail}
+        '404': {description: Not found}
+  /api/clusters:
+    get:
+      summary: List event clusters
+      parameters:
+        - in: query
+          name: q
+          schema: {type: string}
+        - in: query
+          name: ticker
+          schema: {type: string}
+        - in: query
+          name: event_type
+          schema: {type: string}
+        - in: query
+          name: impact_min
+          schema: {type: integer, minimum: 0, maximum: 100}
+        - in: query
+          name: fresh_only
+          schema: {type: boolean, default: true}
+        - in: query
+          name: page
+          schema: {type: integer, minimum: 1, default: 1}
+        - in: query
+          name: page_size
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+      responses:
+        '200': {description: Cluster list}
+  /api/clusters/{id}:
+    get:
+      summary: Cluster detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Cluster detail}
+        '404': {description: Not found}
+  /api/sources:
+    get:
+      summary: Source health list
+      responses:
+        '200': {description: Source list}
+  /api/jobs/llm:
+    get:
+      summary: LLM queue status
+      responses:
+        '200': {description: LLM jobs}
+  /api/admin/crawl-once:
+    post:
+      summary: Trigger immediate crawl
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source_key: {type: string}
+      responses:
+        '202': {description: Crawl triggered}
+  /api/admin/retry-failed-llm:
+    post:
+      summary: Retry failed LLM jobs
+      responses:
+        '202': {description: Retry scheduled}
