@@ -90,7 +90,28 @@ func (a *Adapter) Fetch(ctx context.Context, since time.Time) ([]source.FetchedI
 		for _, ag := range d.Agencies {
 			names = append(names, ag.Name)
 		}
-		out = append(out, source.FetchedItem{SourceKey: a.Src.Key, SourceID: a.Src.ID, RawURL: link, CanonicalURL: normalize.CanonicalURL(link), Title: d.Title, Excerpt: d.Abstract, ContentText: d.Abstract, PublishedAt: &pub, FetchedAt: now, RawPayload: source.RawPayload(d), ContentType: "application/json", HTTPStatus: 200, Metadata: map[string]any{"type": d.Type, "agencies": strings.Join(names, ",")}})
+		contentText := d.Abstract
+		contentHTML := ""
+		contentType := "application/json"
+		httpStatus := 200
+		metadata := map[string]any{"type": d.Type, "agencies": strings.Join(names, ",")}
+		if a.Src.FullContentAllowed && d.HTMLURL != "" {
+			page, err := source.FetchReadableContent(ctx, client, d.HTMLURL, "", source.DefaultMaxArticleBytes)
+			if err != nil {
+				metadata["full_content_error"] = err.Error()
+			} else if page.ContentText != "" {
+				contentText = page.ContentText
+				contentHTML = page.ContentHTML
+				if page.ContentType != "" {
+					contentType = page.ContentType
+				}
+				if page.HTTPStatus != 0 {
+					httpStatus = page.HTTPStatus
+				}
+				metadata["full_content_fetched"] = true
+			}
+		}
+		out = append(out, source.FetchedItem{SourceKey: a.Src.Key, SourceID: a.Src.ID, RawURL: link, CanonicalURL: normalize.CanonicalURL(link), Title: d.Title, Excerpt: d.Abstract, ContentHTML: contentHTML, ContentText: contentText, PublishedAt: &pub, FetchedAt: now, RawPayload: source.RawPayload(map[string]any{"document": d, "content_text": contentText}), ContentType: contentType, HTTPStatus: httpStatus, Metadata: metadata})
 	}
 	return out, nil
 }

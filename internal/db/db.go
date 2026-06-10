@@ -110,11 +110,19 @@ func (s *Store) CreateSourceRun(ctx context.Context, sourceID uuid.UUID) (uuid.U
 }
 
 func (s *Store) FinishSourceRun(ctx context.Context, id uuid.UUID, status string, fetched, raw, articles int, runErr error) error {
+	return s.FinishSourceRunWithMetadata(ctx, id, status, fetched, raw, articles, runErr, nil)
+}
+
+func (s *Store) FinishSourceRunWithMetadata(ctx context.Context, id uuid.UUID, status string, fetched, raw, articles int, runErr error, metadata map[string]any) error {
 	var msg any
 	if runErr != nil {
 		msg = runErr.Error()
 	}
-	_, err := s.DB.ExecContext(ctx, `UPDATE source_runs SET finished_at=CURRENT_TIMESTAMP,status=?,fetched_count=?,inserted_raw_count=?,inserted_article_count=?,error_message=? WHERE id=?`, status, fetched, raw, articles, msg, id.String())
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	meta, _ := json.Marshal(metadata)
+	_, err := s.DB.ExecContext(ctx, `UPDATE source_runs SET finished_at=CURRENT_TIMESTAMP,status=?,fetched_count=?,inserted_raw_count=?,inserted_article_count=?,error_message=?,metadata=? WHERE id=?`, status, fetched, raw, articles, msg, string(meta), id.String())
 	return err
 }
 

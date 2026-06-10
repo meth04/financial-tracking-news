@@ -239,7 +239,7 @@ func scanClusterArticle(row scanner) (Article, string, error) {
 }
 
 func (s *Store) ListSourceHealth(ctx context.Context) ([]map[string]any, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT src.key,src.name,src.type,src.enabled,src.credibility_score,src.crawl_interval_minutes, sr.status,sr.started_at,sr.finished_at,COALESCE(sr.fetched_count,0),COALESCE(sr.inserted_raw_count,0),sr.error_message,(SELECT count(*) FROM source_runs r WHERE r.source_id=src.id AND r.status='failed') FROM sources src LEFT JOIN source_runs sr ON sr.id=(SELECT id FROM source_runs r WHERE r.source_id=src.id ORDER BY r.started_at DESC LIMIT 1) ORDER BY src.key`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT src.key,src.name,src.type,src.enabled,src.credibility_score,src.crawl_interval_minutes, sr.status,sr.started_at,sr.finished_at,COALESCE(sr.fetched_count,0),COALESCE(sr.inserted_raw_count,0),COALESCE(sr.inserted_article_count,0),sr.error_message,COALESCE(sr.metadata,'{}'),(SELECT count(*) FROM source_runs r WHERE r.source_id=src.id AND r.status='failed') FROM sources src LEFT JOIN source_runs sr ON sr.id=(SELECT id FROM source_runs r WHERE r.source_id=src.id ORDER BY r.started_at DESC LIMIT 1) ORDER BY src.key`)
 	if err != nil {
 		return nil, err
 	}
@@ -248,18 +248,34 @@ func (s *Store) ListSourceHealth(ctx context.Context) ([]map[string]any, error) 
 	for rows.Next() {
 		var key, name, typ string
 		var enabled int
-		var cred, interval, fetched, raw, errs int
+		var cred, interval, fetched, raw, articles, errs int
 		var status, msg sql.NullString
+		var metaText string
 		var started, finished sql.NullTime
-		if err := rows.Scan(&key, &name, &typ, &enabled, &cred, &interval, &status, &started, &finished, &fetched, &raw, &msg, &errs); err != nil {
+		if err := rows.Scan(&key, &name, &typ, &enabled, &cred, &interval, &status, &started, &finished, &fetched, &raw, &articles, &msg, &metaText, &errs); err != nil {
 			return nil, err
 		}
-		m := map[string]any{"key": key, "name": name, "type": typ, "enabled": enabled != 0, "credibility_score": cred, "crawl_interval_minutes": interval, "error_count": errs, "health": "unknown", "last_fetched_count": fetched, "last_inserted_raw_count": raw}
+		metadata := map[string]any{}
+		_ = json.Unmarshal([]byte(metaText), &metadata)
+		m := map[string]any{"key": key, "name": name, "type": typ, "enabled": enabled != 0, "credibility_score": cred, "crawl_interval_minutes": interval, "error_count": errs, "health": "unknown", "last_fetched_count": fetched, "last_inserted_raw_count": raw, "last_inserted_article_count": articles, "last_run_metadata": metadata}
+		if reason, ok := metadata["no_fresh_reason"].(string); ok && reason != "" {
+			m["last_no_fresh_reason"] = reason
+		}
+		for _, key := range []string{"candidate_links", "raw_candidate_count", "older_than_window_count", "quality_rejected_count", "content_fetch_failed", "missing_date_count", "returned_fresh_count", "article_inserted_count"} {
+			if v, ok := metadata[key]; ok {
+				m["last_"+key] = v
+			}
+		}
 		if status.Valid {
 			m["last_status"] = status.String
-			if status.String == "success" {
+			switch status.String {
+			case "success":
 				m["health"] = "ok"
-			} else {
+			case "running":
+				m["health"] = "running"
+			case "partial":
+				m["health"] = "warning"
+			default:
 				m["health"] = "error"
 			}
 		}

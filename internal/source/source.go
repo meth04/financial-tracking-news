@@ -32,6 +32,16 @@ type Adapter interface {
 	Fetch(ctx context.Context, since time.Time) ([]FetchedItem, error)
 }
 
+type FetchResult struct {
+	Items    []FetchedItem  `json:"items"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+type DiagnosticAdapter interface {
+	Name() string
+	FetchWithDiagnostics(ctx context.Context, since time.Time) (FetchResult, error)
+}
+
 func RawPayload(v any) []byte { b, _ := json.Marshal(v); return b }
 
 func SourceConfigValue[T any](src db.Source, key string, def T) T {

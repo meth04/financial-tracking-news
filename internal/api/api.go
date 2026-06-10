@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -40,7 +43,7 @@ func New(s *db.Store, cfg config.Config, cr *crawler.Service, log *slog.Logger) 
 	r.Get("/api/jobs/llm", srv.llmJobs)
 	r.Post("/api/admin/crawl-once", srv.crawlOnce)
 	r.Post("/api/admin/retry-failed-llm", srv.retryLLM)
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+	r.Get("/*", srv.static)
 	return r
 }
 
@@ -143,6 +146,49 @@ func (s *Server) retryLLM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 202, map[string]any{"reset": n})
+}
+
+func (s *Server) static(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		http.NotFound(w, r)
+		return
+	}
+	distDir, ok := staticDistDir()
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	indexPath := filepath.Join(distDir, "index.html")
+	cleanPath := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/"))
+	if cleanPath == "/" {
+		http.ServeFile(w, r, indexPath)
+		return
+	}
+	rel := strings.TrimPrefix(cleanPath, "/")
+	target := filepath.Join(distDir, filepath.FromSlash(rel))
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		http.ServeFile(w, r, target)
+		return
+	}
+	if path.Ext(cleanPath) != "" {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, indexPath)
+}
+
+func staticDistDir() (string, bool) {
+	for _, dir := range []string{
+		filepath.Join("web", "dist"),
+		filepath.Join("..", "web", "dist"),
+		filepath.Join("..", "..", "web", "dist"),
+	} {
+		indexPath := filepath.Join(dir, "index.html")
+		if info, err := os.Stat(indexPath); err == nil && !info.IsDir() {
+			return dir, true
+		}
+	}
+	return "", false
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

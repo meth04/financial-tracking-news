@@ -42,7 +42,17 @@ npm run dev
 Open:
 
 - Backend API: <http://localhost:8080/api/health>
-- Frontend: <http://localhost:5173>
+- Frontend in development: <http://localhost:5173>
+
+For a single local process, build the frontend once and let the Go server serve `web/dist` directly:
+
+```bash
+cd web && npm run build
+cd ..
+go run ./cmd/finnews server
+```
+
+Then open <http://localhost:8080>.
 
 ## CLI commands
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,7 +90,9 @@ func (s *Service) crawlSource(ctx context.Context, src db.Source) error {
 		return err
 	}
 	since := time.Now().Add(-time.Duration(src.MaxAgeHours) * time.Hour)
-	items, fetchErr := ad.Fetch(ctx, since)
+	items, metadata, fetchErr := fetchWithMetadata(ctx, ad, since)
+	metadata["source_key"] = src.Key
+	metadata["since"] = since.UTC()
 	insertedRaw := 0
 	insertedArticles := 0
 	status := "success"
@@ -97,22 +100,65 @@ func (s *Service) crawlSource(ctx context.Context, src db.Source) error {
 		status = "failed"
 	} else {
 		for _, item := range items {
-			rawOK, artOK := s.processItem(ctx, src, runID, item)
-			if rawOK {
+			res := s.processItem(ctx, src, runID, item)
+			if res.RawInserted {
 				insertedRaw++
 			}
-			if artOK {
+			if res.ArticleInserted {
 				insertedArticles++
 			}
+			if res.QualityRejected {
+				incMeta(metadata, "quality_rejected_count")
+				if res.Reason != "" {
+					metadata["last_quality_rejection_reason"] = res.Reason
+				}
+			}
+			if res.ExactDuplicate {
+				incMeta(metadata, "duplicate_count")
+			}
+			if res.Outdated {
+				incMeta(metadata, "outdated_after_normalization_count")
+			}
+			if res.LLMEnqueued {
+				incMeta(metadata, "llm_enqueued_count")
+			}
 		}
+	}
+	metadata["returned_item_count"] = len(items)
+	metadata["raw_inserted_count"] = insertedRaw
+	metadata["article_inserted_count"] = insertedArticles
+	if insertedArticles == 0 && metadata["no_fresh_reason"] == nil {
+		metadata["no_fresh_reason"] = noArticleReason(metadata, len(items))
 	}
 	if fetchErr != nil {
 		s.Log.Warn("source fetch failed", "source", src.Key, "error", fetchErr)
 	}
-	return s.Store.FinishSourceRun(ctx, runID, status, len(items), insertedRaw, insertedArticles, fetchErr)
+	return s.Store.FinishSourceRunWithMetadata(ctx, runID, status, len(items), insertedRaw, insertedArticles, fetchErr, metadata)
 }
 
-func (s *Service) processItem(ctx context.Context, src db.Source, runID uuid.UUID, item source.FetchedItem) (bool, bool) {
+type processResult struct {
+	RawInserted     bool
+	ArticleInserted bool
+	QualityRejected bool
+	ExactDuplicate  bool
+	Outdated        bool
+	LLMEnqueued     bool
+	Reason          string
+}
+
+func fetchWithMetadata(ctx context.Context, ad source.Adapter, since time.Time) ([]source.FetchedItem, map[string]any, error) {
+	if diag, ok := ad.(source.DiagnosticAdapter); ok {
+		res, err := diag.FetchWithDiagnostics(ctx, since)
+		if res.Metadata == nil {
+			res.Metadata = map[string]any{}
+		}
+		return res.Items, res.Metadata, err
+	}
+	items, err := ad.Fetch(ctx, since)
+	return items, map[string]any{"adapter": ad.Name(), "returned_fresh_count": len(items)}, err
+}
+
+func (s *Service) processItem(ctx context.Context, src db.Source, runID uuid.UUID, item source.FetchedItem) processResult {
 	// Raw item is persisted before normalization, deduplication, and LLM enqueueing.
 	can := item.CanonicalURL
 	if can == "" {
@@ -138,7 +184,12 @@ func (s *Service) processItem(ctx context.Context, src db.Source, runID uuid.UUI
 	rawID, rawInserted, err := s.Store.InsertRawItem(ctx, ri)
 	if err != nil {
 		s.Log.Warn("insert raw failed", "source", src.Key, "error", err)
-		return false, false
+		return processResult{Reason: err.Error()}
+	}
+	quality := assessItemQuality(src, item)
+	if !quality.OK {
+		s.Log.Warn("skip low-quality fetched item", "source", src.Key, "title", item.Title, "reason", quality.Reason, "content_chars", quality.ContentChars)
+		return processResult{RawInserted: rawInserted, QualityRejected: true, Reason: quality.Reason}
 	}
 	article := normalizeItem(src, rawID, item, can, time.Duration(src.MaxAgeHours)*time.Hour)
 	engine := dedup.Engine{Store: s.Store, Window: time.Duration(src.MaxAgeHours) * time.Hour}
@@ -149,18 +200,82 @@ func (s *Service) processItem(ctx context.Context, src db.Source, runID uuid.UUI
 	articleID, inserted, err := s.Store.InsertArticle(ctx, article)
 	if err != nil {
 		s.Log.Warn("insert article failed", "source", src.Key, "error", err)
-		return rawInserted, false
+		return processResult{RawInserted: rawInserted, Reason: err.Error()}
 	}
+	res := processResult{RawInserted: rawInserted, ArticleInserted: inserted, Outdated: article.IsOutdated}
 	if decision.DuplicateOf != nil && decision.Kind == dedup.KindExactDuplicate {
 		_ = s.Store.InsertDuplicate(ctx, articleID, *decision.DuplicateOf, "content_hash", &decision.Similarity, decision.Reason)
 		_ = s.Store.UpdateArticleStatus(ctx, articleID, "duplicate")
-		return rawInserted, inserted
+		res.ExactDuplicate = true
+		res.Reason = decision.Reason
+		return res
 	}
 	if !article.IsOutdated && decision.Kind != dedup.KindExactDuplicate {
 		_ = s.Store.EnqueueLLMJob(ctx, articleID, 0, s.Config.LLM.MaxAttempts)
 		_ = s.Store.UpdateArticleStatus(ctx, articleID, "llm_pending")
+		res.LLMEnqueued = true
 	}
-	return rawInserted, inserted
+	return res
+}
+
+type qualityDecision struct {
+	OK           bool
+	Reason       string
+	ContentChars int
+	WordCount    int
+}
+
+func assessItemQuality(src db.Source, item source.FetchedItem) qualityDecision {
+	title := strings.TrimSpace(item.Title)
+	text := normalize.CleanText(firstNonEmpty(item.ContentText, item.Excerpt))
+	decision := qualityDecision{OK: true, ContentChars: len([]rune(text)), WordCount: normalize.WordCount(text)}
+	if title == "" {
+		decision.OK = false
+		decision.Reason = "missing title"
+		return decision
+	}
+	if looksLikeNavigationTitle(title) {
+		decision.OK = false
+		decision.Reason = "title looks like navigation or non-article text"
+		return decision
+	}
+	if strings.TrimSpace(firstNonEmpty(item.CanonicalURL, item.RawURL)) == "" {
+		decision.OK = false
+		decision.Reason = "missing article URL"
+		return decision
+	}
+	allowShort := source.SourceConfigValue(src, "allow_short_content", !src.FullContentAllowed)
+	requireArticleContent := source.SourceConfigValue(src, "require_article_content", src.FullContentAllowed)
+	minChars := source.SourceConfigValue(src, "min_content_chars", 0)
+	if minChars <= 0 && src.FullContentAllowed {
+		minChars = 300
+	}
+	minWords := source.SourceConfigValue(src, "min_word_count", 0)
+	if minWords <= 0 && minChars > 0 {
+		minWords = 45
+	}
+	if requireArticleContent && !allowShort && (decision.ContentChars < minChars || decision.WordCount < minWords) {
+		decision.OK = false
+		decision.Reason = "content below article-quality threshold"
+		return decision
+	}
+	return decision
+}
+
+func looksLikeNavigationTitle(title string) bool {
+	low := strings.ToLower(strings.TrimSpace(title))
+	low = strings.Trim(low, " \t\n\r|-/—:.")
+	if len(low) < 8 {
+		return true
+	}
+	navTitles := map[string]bool{
+		"home": true, "news": true, "newsroom": true, "press releases": true, "rss": true, "rss feeds": true,
+		"subscribe": true, "search": true, "contact": true, "about": true, "careers": true, "events": true,
+	}
+	if navTitles[low] {
+		return true
+	}
+	return strings.Contains(low, "subscribe to") || strings.Contains(low, "sign up") || strings.Contains(low, "email alerts") || strings.Contains(low, "skip to")
 }
 
 func normalizeItem(src db.Source, rawID uuid.UUID, item source.FetchedItem, canonical string, maxAge time.Duration) db.Article {
@@ -246,6 +361,61 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func incMeta(metadata map[string]any, key string) {
+	if metadata == nil {
+		return
+	}
+	if v, ok := metadata[key]; ok {
+		switch n := v.(type) {
+		case int:
+			metadata[key] = n + 1
+		case int64:
+			metadata[key] = n + 1
+		case float64:
+			metadata[key] = n + 1
+		default:
+			metadata[key] = 1
+		}
+		return
+	}
+	metadata[key] = 1
+}
+
+func metaCount(metadata map[string]any, key string) int {
+	if metadata == nil {
+		return 0
+	}
+	switch v := metadata[key].(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+func noArticleReason(metadata map[string]any, returned int) string {
+	if returned == 0 {
+		if v, ok := metadata["no_fresh_reason"].(string); ok && v != "" {
+			return v
+		}
+		return "source_reachable_no_recent_items"
+	}
+	if metaCount(metadata, "quality_rejected_count") >= returned {
+		return "all_candidates_failed_quality_gate"
+	}
+	if metaCount(metadata, "duplicate_count") >= returned {
+		return "all_candidates_duplicate"
+	}
+	if metaCount(metadata, "outdated_after_normalization_count") >= returned {
+		return "all_candidates_outdated"
+	}
+	return "no_new_articles_inserted"
 }
 
 type uuidLike interface{ UUID() uuid.UUID }

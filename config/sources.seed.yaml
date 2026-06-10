@@ -90,6 +90,31 @@ sources:
     rate_limit_per_minute: 15
     respect_robots: true
     tags: [treasury, sanctions, fiscal, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "article, .views-row, .view-content .views-row, li"
+          link_selector: "a[href*='/news/press-releases/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .datetime, .date, .field--name-created"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .datetime, .date, .field--name-created"
+          date_attr: datetime
+          body_selector: ".field--name-body, .node__content, article, main, .content"
+          remove_selectors: [nav, header, footer, aside, .related, .social-share]
+        filters:
+          include_url_patterns: ["/news/press-releases/"]
+          exclude_url_patterns: [".pdf", "/search", "/subscribe"]
+          allowed_domains: [home.treasury.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 60
+        max_article_fetches: 30
+        allow_missing_dates: true
 
   - key: sec_edgar_watchlist
     name: SEC EDGAR - Watchlist Filings
@@ -120,3 +145,511 @@ sources:
     rate_limit_per_minute: 15
     respect_robots: true
     tags: [bls, labor_market, inflation, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "table tr, .latest-releases li, li"
+          link_selector: "a[href*='/news.release/']"
+          title_selector: "a"
+          date_selector: "time, td, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .release-date, .date"
+          date_attr: datetime
+          body_selector: "#bodytext, #main-content, .body, article, main"
+          remove_selectors: [nav, header, footer, aside, table, .social]
+        filters:
+          include_url_patterns: ["/news.release/"]
+          exclude_url_patterns: [".pdf", "/schedule/", "/rss/", "/archives/"]
+          allowed_domains: [www.bls.gov, bls.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02", "01/02/2006"]
+        max_items: 80
+        max_article_fetches: 30
+        allow_missing_dates: true
+
+  - key: fed_testimony
+    name: Federal Reserve - Testimony
+    type: rss
+    url: https://www.federalreserve.gov/feeds/testimony.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, testimony, macro, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: fed_press_bcreg
+    name: Federal Reserve - Banking and Consumer Regulation Press Releases
+    type: rss
+    url: https://www.federalreserve.gov/feeds/press_bcreg.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, banking, regulation, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: fed_press_enforcement
+    name: Federal Reserve - Enforcement Actions Press Releases
+    type: rss
+    url: https://www.federalreserve.gov/feeds/press_enforcement.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 20
+    respect_robots: true
+    tags: [fed, enforcement, banking, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: sec_press_releases
+    name: SEC - Press Releases
+    type: rss
+    url: https://www.sec.gov/news/pressreleases.rss
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [sec, securities, enforcement, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: fdic_press_releases
+    name: FDIC - Press Releases
+    type: rss
+    url: https://public.govdelivery.com/topics/USFDIC_26/feed.rss
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fdic, banking, financial_stability, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: cftc_press_releases
+    name: CFTC - General Press Releases
+    type: rss
+    url: https://www.cftc.gov/RSS/RSSGP/rssgp.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [cftc, commodities, derivatives, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: cftc_enforcement_press_releases
+    name: CFTC - Enforcement Press Releases
+    type: rss
+    url: https://www.cftc.gov/RSS/RSSENF/rssenf.xml
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [cftc, enforcement, commodities, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: cfpb_newsroom
+    name: CFPB - Newsroom
+    type: rss
+    url: https://www.consumerfinance.gov/about-us/newsroom/feed/
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [cfpb, consumer_finance, regulation, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: eia_today_in_energy
+    name: EIA - Today in Energy
+    type: rss
+    url: https://www.eia.gov/rss/todayinenergy.xml
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [eia, energy, commodities, inflation, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: eia_press_releases
+    name: EIA - Press Releases
+    type: rss
+    url: https://www.eia.gov/rss/press_rss.xml
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [eia, energy, commodities, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: ftc_business_blog
+    name: FTC - Business Blog
+    type: rss
+    url: https://www.ftc.gov/feeds/blog-business.xml
+    credibility_score: 95
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [ftc, competition, consumer_protection, business, official]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: nyfed_liberty_street_economics
+    name: New York Fed - Liberty Street Economics
+    type: rss
+    url: https://libertystreeteconomics.newyorkfed.org/feed/
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fed, nyfed, macro, banking, research]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: stlouisfed_on_the_economy
+    name: St. Louis Fed - On the Economy
+    type: rss
+    url: https://www.stlouisfed.org/rss/page%20resources/publications/blog-entries
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fed, stlouisfed, macro, research]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: fred_blog
+    name: FRED Blog
+    type: rss
+    url: https://fredblog.stlouisfed.org/feed/
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fred, stlouisfed, macro, data, research]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: atlantafed_macroblog
+    name: Atlanta Fed - Macroblog
+    type: rss
+    url: https://www.atlantafed.org/RSS/macroblog
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fed, atlantafed, macro, research]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+
+  - key: fed_press_releases_html
+    name: Federal Reserve - Press Releases HTML
+    type: html
+    url: https://www.federalreserve.gov/newsevents/pressreleases/2026-press.htm
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fed, macro, regulation, official, html]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "a[href*='/newsevents/pressreleases/']"
+          link_selector: "a[href]"
+          title_selector: "a"
+          date_selector: "time, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .article__time, .date"
+          date_attr: datetime
+          body_selector: "main, article, #content, .container__main"
+          remove_selectors: [nav, header, footer, aside, .share, .related]
+        filters:
+          include_url_patterns: ["/newsevents/pressreleases/"]
+          exclude_url_patterns: [".pdf", "/rss", "/videos", "pressreleases.htm", "2026-press.htm", "2026-press-fomc.htm"]
+          allowed_domains: [www.federalreserve.gov, federalreserve.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 80
+        max_article_fetches: 30
+        allow_missing_dates: true
+
+  - key: sec_press_releases_html
+    name: SEC - Press Releases HTML
+    type: html
+    url: https://www.sec.gov/newsroom/press-releases
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [sec, securities, enforcement, official, html]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "article, .views-row, .card, tr, li"
+          link_selector: "a[href*='/newsroom/press-releases/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .datetime, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .datetime, .date"
+          date_attr: datetime
+          body_selector: ".field--name-body, .body, .node__content, article, main"
+          remove_selectors: [nav, header, footer, aside, .share, .related]
+        filters:
+          include_url_patterns: ["/newsroom/press-releases/"]
+          exclude_url_patterns: [".pdf", "/search", "/rss"]
+          allowed_domains: [www.sec.gov, sec.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 60
+        max_article_fetches: 25
+        allow_missing_dates: true
+
+  - key: fdic_press_releases_html
+    name: FDIC - Press Releases HTML
+    type: html
+    url: https://www.fdic.gov/news/press-releases
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fdic, banking, financial_stability, official, html]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "article, .views-row, .card, li"
+          link_selector: "a[href*='/news/press-releases/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .datetime, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .datetime, .date"
+          date_attr: datetime
+          body_selector: ".field--name-body, .body, .node__content, article, main"
+          remove_selectors: [nav, header, footer, aside, .share, .related]
+        filters:
+          include_url_patterns: ["/news/press-releases/"]
+          exclude_url_patterns: [".pdf", "/search", "/subscribe"]
+          allowed_domains: [www.fdic.gov, fdic.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 60
+        max_article_fetches: 25
+        allow_missing_dates: true
+
+  - key: bea_current_releases_html
+    name: BEA - Current Releases HTML
+    type: html
+    url: https://www.bea.gov/news/current-releases
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [bea, gdp, pce, macro, official, html]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: ".views-row, article, li, tr"
+          link_selector: "a[href*='/news/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .date-display-single, .datetime, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .date, .release-date"
+          date_attr: datetime
+          body_selector: ".field--name-body, .node__content, article, main, .content"
+          remove_selectors: [nav, header, footer, aside, table, .related]
+        filters:
+          include_url_patterns: ["/news/20"]
+          exclude_url_patterns: [".pdf", "/search", "/current-releases", "/news/glance", "/news/schedule", "/news/release-schedule"]
+          allowed_domains: [www.bea.gov, bea.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 60
+        max_article_fetches: 25
+        allow_missing_dates: true
+
+  - key: cfpb_newsroom_html
+    name: CFPB - Newsroom HTML
+    type: html
+    url: https://www.consumerfinance.gov/about-us/newsroom/
+    credibility_score: 100
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 15
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [cfpb, consumer_finance, regulation, official, html]
+    config:
+      min_content_chars: 300
+      min_word_count: 45
+      require_article_content: true
+      html:
+        list:
+          item_selector: "article, .m-list_item, .content-l, li"
+          link_selector: "a[href*='/about-us/newsroom/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .date"
+          date_attr: datetime
+          body_selector: ".content_main, article, .o-post-preview, .block, main"
+          remove_selectors: [nav, header, footer, aside, .social, .related]
+        filters:
+          include_url_patterns: ["/about-us/newsroom/"]
+          exclude_url_patterns: ["/feed", ".pdf", "#"]
+          allowed_domains: [www.consumerfinance.gov, consumerfinance.gov]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 60
+        max_article_fetches: 25
+        allow_missing_dates: true
+
+  - key: frb_services_news_html
+    name: Federal Reserve Financial Services - News HTML
+    type: html
+    url: https://www.frbservices.org/news/press-releases
+    credibility_score: 98
+    enabled: true
+    full_content_allowed: true
+    crawl_interval_minutes: 30
+    max_age_hours: 72
+    rate_limit_per_minute: 10
+    respect_robots: true
+    tags: [fed, payments, banking, official, html]
+    config:
+      min_content_chars: 250
+      min_word_count: 35
+      require_article_content: true
+      html:
+        list:
+          item_selector: "article, .card, li, .cmp-teaser"
+          link_selector: "a[href*='/news/']"
+          title_selector: "a, h2, h3"
+          date_selector: "time, .date"
+          date_attr: datetime
+        article:
+          title_selector: "h1"
+          date_selector: "time, .date"
+          date_attr: datetime
+          body_selector: ".cmp-text, article, main, .content"
+          remove_selectors: [nav, header, footer, aside, .social, .related]
+        filters:
+          include_url_patterns: ["/news/press-releases/"]
+          exclude_url_patterns: [".pdf", "/subscribe", "/events", "/news/$"]
+          allowed_domains: [www.frbservices.org, frbservices.org]
+        date_formats: ["January 2, 2006", "Jan. 2, 2006", "2006-01-02"]
+        max_items: 50
+        max_article_fetches: 20
+        allow_missing_dates: true

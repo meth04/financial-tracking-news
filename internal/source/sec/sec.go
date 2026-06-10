@@ -104,7 +104,29 @@ func (a *Adapter) Fetch(ctx context.Context, since time.Time) ([]source.FetchedI
 			}
 			link := fmt.Sprintf("https://www.sec.gov/Archives/edgar/data/%d/%s/%s", info.CIK, strings.ReplaceAll(acc, "-", ""), doc)
 			title := fmt.Sprintf("%s %s filed %s", strings.ToUpper(sym), form, pub.Format("2006-01-02"))
-			out = append(out, source.FetchedItem{SourceKey: a.Src.Key, SourceID: a.Src.ID, RawURL: link, CanonicalURL: normalize.CanonicalURL(link), Title: title, Excerpt: fmt.Sprintf("%s filed form %s with the SEC.", info.Title, form), ContentText: fmt.Sprintf("%s filed form %s with the SEC on %s. Accession %s.", info.Title, form, pub.Format("2006-01-02"), acc), PublishedAt: &pub, FetchedAt: now, RawPayload: source.RawPayload(map[string]any{"ticker": sym, "form": form, "date": pub, "accession": acc, "document": doc}), ContentType: "application/json", HTTPStatus: 200, Metadata: map[string]any{"ticker": strings.ToUpper(sym), "form": form, "accession": acc}})
+			excerpt := fmt.Sprintf("%s filed form %s with the SEC.", info.Title, form)
+			contentText := fmt.Sprintf("%s filed form %s with the SEC on %s. Accession %s.", info.Title, form, pub.Format("2006-01-02"), acc)
+			contentHTML := ""
+			contentType := "application/json"
+			httpStatus := 200
+			metadata := map[string]any{"ticker": strings.ToUpper(sym), "form": form, "accession": acc}
+			if a.Src.FullContentAllowed && doc != "" {
+				page, err := source.FetchReadableContent(ctx, client, link, a.UserAgent, source.DefaultMaxArticleBytes)
+				if err != nil {
+					metadata["full_content_error"] = err.Error()
+				} else if page.ContentText != "" {
+					contentText = page.ContentText
+					contentHTML = page.ContentHTML
+					if page.ContentType != "" {
+						contentType = page.ContentType
+					}
+					if page.HTTPStatus != 0 {
+						httpStatus = page.HTTPStatus
+					}
+					metadata["full_content_fetched"] = true
+				}
+			}
+			out = append(out, source.FetchedItem{SourceKey: a.Src.Key, SourceID: a.Src.ID, RawURL: link, CanonicalURL: normalize.CanonicalURL(link), Title: title, Excerpt: excerpt, ContentHTML: contentHTML, ContentText: contentText, PublishedAt: &pub, FetchedAt: now, RawPayload: source.RawPayload(map[string]any{"ticker": sym, "form": form, "date": pub, "accession": acc, "document": doc, "content_text": contentText}), ContentType: contentType, HTTPStatus: httpStatus, Metadata: metadata})
 		}
 	}
 	return out, nil

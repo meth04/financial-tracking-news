@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,22 +70,56 @@ func (c *OpenAIClient) AnalyzeArticle(ctx context.Context, article db.Article) (
 }
 
 func RenderPrompt(t string, a db.Article) string {
-	repl := map[string]string{"{{title}}": a.Title, "{{source}}": a.SourceName, "{{published_at}}": "", "{{excerpt}}": "", "{{content}}": ""}
+	publishedAt := ""
 	if a.PublishedAt != nil {
-		repl["{{published_at}}"] = a.PublishedAt.Format(time.RFC3339)
+		publishedAt = a.PublishedAt.Format(time.RFC3339)
 	}
+	canonicalURL := ""
+	if a.CanonicalURL != nil {
+		canonicalURL = *a.CanonicalURL
+	}
+	author := ""
+	if a.Author != nil {
+		author = *a.Author
+	}
+	excerpt := ""
 	if a.Excerpt != nil {
-		repl["{{excerpt}}"] = *a.Excerpt
+		excerpt = *a.Excerpt
 	}
+	contentText := ""
 	if a.ContentText != nil {
-		repl["{{content}}"] = *a.ContentText
+		contentText = *a.ContentText
+	}
+	contentHTML := ""
+	if a.ContentHTML != nil {
+		contentHTML = *a.ContentHTML
+	}
+
+	repl := map[string]string{
+		"{{title}}":                    a.Title,
+		"{{normalized_title}}":         a.NormalizedTitle,
+		"{{source}}":                   a.SourceName,
+		"{{source_name}}":              a.SourceName,
+		"{{source_key}}":               a.SourceKey,
+		"{{source_credibility_score}}": strconv.Itoa(a.SourceCredibilityScore),
+		"{{canonical_url}}":            canonicalURL,
+		"{{author}}":                   author,
+		"{{published_at}}":             publishedAt,
+		"{{fetched_at}}":               a.FetchedAt.Format(time.RFC3339),
+		"{{time_confidence}}":          a.TimeConfidence,
+		"{{status}}":                   a.Status,
+		"{{excerpt}}":                  excerpt,
+		"{{content}}":                  contentText,
+		"{{content_text}}":             contentText,
+		"{{content_html}}":             contentHTML,
+		"{{word_count}}":               strconv.Itoa(a.WordCount),
 	}
 	out := t
 	for k, v := range repl {
 		out = strings.ReplaceAll(out, k, v)
 	}
 	if !strings.Contains(t, "{{title}}") {
-		out = fmt.Sprintf("Title: %s\nSource: %s\nPublished: %s\nExcerpt: %s\nContent: %s", repl["{{title}}"], repl["{{source}}"], repl["{{published_at}}"], repl["{{excerpt}}"], repl["{{content}}"])
+		out = fmt.Sprintf("Title: %s\nSource: %s\nPublished: %s\nFetched: %s\nURL: %s\nExcerpt: %s\nContent: %s", repl["{{title}}"], repl["{{source_name}}"], repl["{{published_at}}"], repl["{{fetched_at}}"], repl["{{canonical_url}}"], repl["{{excerpt}}"], repl["{{content_text}}"])
 	}
 	return out
 }
